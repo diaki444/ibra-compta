@@ -1,0 +1,7 @@
+{
+  "name": "IBRA-COMPTA",
+  "description": "An accounting application for Belgian freelancers to manage income, expenses, VAT, and invoicing, featuring an AI assistant for accounting advice.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
