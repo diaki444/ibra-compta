@@ -1,4 +1,4 @@
-export type Page = 'dashboard' | 'revenues' | 'expenses' | 'vat' | 'invoicing' | 'reports' | 'ai-assistant';
+export type Page = 'dashboard' | 'revenues' | 'expenses' | 'vat' | 'invoicing' | 'reports' | 'ai-assistant' | 'profile';
 
 export type TransactionType = 'revenue' | 'expense';
 
@@ -41,4 +41,13 @@ export interface AiMessage {
   sender: 'user' | 'ai';
   text: string;
   sources?: AiMessageSource[];
+}
+
+export interface UserProfile {
+  name: string;
+  companyName: string;
+  vatNumber: string;
+  address: string;
+  email: string;
+  phone: string;
 }

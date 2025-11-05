@@ -1,5 +1,5 @@
 
-import { Transaction, Invoice } from '../types';
+import { Transaction, Invoice, UserProfile } from '../types';
 
 export const mockTransactions: Transaction[] = [
   { id: 'T1', type: 'revenue', source: 'Uber', amountExVat: 120.50, vatRate: 6, totalAmount: 127.73, vatAmount: 7.23, date: '2024-07-15', paymentMethod: 'Bank Transfer' },
@@ -16,3 +16,12 @@ export const mockInvoices: Invoice[] = [
   { id: 'I2', invoiceNumber: 'INV-2024-0002', clientName: 'Client B', clientAddress: '456 Avenue de Flandre, 9000 Gand', serviceDescription: 'Graphic Design', amountExVat: 750, vatRate: 21, totalAmount: 907.50, issueDate: '2024-07-20', dueDate: '2024-08-05', status: 'En attente' },
   { id: 'I3', invoiceNumber: 'INV-2024-0003', clientName: 'Client C', clientAddress: '789 Boulevard d\'Anvers, 2000 Anvers', serviceDescription: 'Consulting', amountExVat: 1200, vatRate: 21, totalAmount: 1452, issueDate: '2024-06-25', dueDate: '2024-07-10', status: 'Impayée' },
 ];
+
+export const mockUserProfile: UserProfile = {
+  name: "Ibrahim Diallo",
+  companyName: "IBRA-COMPTA Services",
+  vatNumber: "BE 0123.456.789",
+  address: "123 Rue de l'Exemple, 1000 Bruxelles, Belgique",
+  email: "ibrahim.diallo@example.com",
+  phone: "+32 412 34 56 78",
+};
