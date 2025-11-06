@@ -12,6 +12,7 @@ import {
     LogoutIcon,
     BellIcon,
 } from './icons';
+import { LogoFull, LogoIcon } from './Logo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -66,8 +67,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, setCurrentPage, 
 
   const SidebarContent = () => (
     <>
-      <div className="h-16 flex items-center justify-center text-2xl font-bold text-white border-b border-gray-700 flex-shrink-0">
-          IBRA-COMPTA
+      <div className="h-16 flex items-center justify-center px-4 border-b border-gray-700 flex-shrink-0">
+          <LogoFull />
       </div>
       
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -134,6 +135,9 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, setCurrentPage, 
                  <button className="md:hidden mr-4 text-gray-400 hover:text-white" onClick={() => setIsSidebarOpen(true)}>
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
+                <div className="md:hidden mr-3">
+                    <LogoIcon />
+                </div>
                 <h1 className="text-xl font-semibold text-white">{pageTitles[currentPage]}</h1>
             </div>
             <div className="relative">
