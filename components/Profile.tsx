@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import Card from './Card';
-import { authService } from '../services/authService';
-import { profileService } from '../services/profileService';
 
 interface ProfileProps {
   profile: UserProfile;
@@ -13,10 +11,6 @@ interface ProfileProps {
 const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onDeleteAccount }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UserProfile>(profile);
-
-  useEffect(() => {
-    setFormData(profile);
-  }, [profile]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [summaryEnabled, setSummaryEnabled] = useState(true);
@@ -45,18 +39,9 @@ const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onDeleteAccount 
       });
   };
 
-  const handleSave = async () => {
-    try {
-      const user = await authService.getCurrentUser();
-      if (user) {
-        await profileService.updateProfile(user.id, formData);
-        setProfile(formData);
-        setIsEditing(false);
-      }
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      alert('Erreur lors de la sauvegarde du profil.');
-    }
+  const handleSave = () => {
+    setProfile(formData);
+    setIsEditing(false);
   };
 
   const handleSendInvitation = (e: React.FormEvent) => {

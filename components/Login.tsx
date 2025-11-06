@@ -1,61 +1,47 @@
 import React, { useState } from 'react';
-import { authService } from '../services/authService';
-import { profileService } from '../services/profileService';
-import { mockUserProfile } from '../data/mockData';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (email: string, password: string) => boolean;
+  onSignUp: (name: string, email: string, password: string) => boolean;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onSignUp }) => {
     const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
     
-    const [email, setEmail] = useState('ibrahim.diallo@example.com');
-    const [password, setPassword] = useState('password');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     
     const [name, setName] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
     const [error, setError] = useState('');
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLoginSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        try {
-            await authService.signIn(email, password);
-            onLogin();
-        } catch (err: any) {
-            setError(err.message || 'Email ou mot de passe incorrect.');
+        const success = onLogin(email, password);
+        if (!success) {
+            setError('Email ou mot de passe incorrect.');
         }
     };
 
-    const handleSignUp = async (e: React.FormEvent) => {
+    const handleSignUpSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         if (password !== confirmPassword) {
             setError('Les mots de passe ne correspondent pas.');
             return;
         }
-        try {
-            const { user } = await authService.signUp(email, password);
-            if (user) {
-                await profileService.createProfile(user.id, {
-                    name,
-                    email,
-                    companyName: mockUserProfile.companyName,
-                    vatNumber: mockUserProfile.vatNumber,
-                    address: mockUserProfile.address,
-                    phone: mockUserProfile.phone,
-                    alertSettings: mockUserProfile.alertSettings,
-                });
-            }
+        if (!name.trim()) {
+            setError('Le nom est requis.');
+            return;
+        }
+        const success = onSignUp(name, email, password);
+        if (success) {
             alert(`Compte créé pour ${name} ! Vous pouvez maintenant vous connecter.`);
-            setAuthMode('login');
-            setName('');
-            setConfirmPassword('');
-            setPassword('');
-        } catch (err: any) {
-            setError(err.message || 'Erreur lors de la création du compte.');
+            toggleAuthMode();
+        } else {
+            setError('Un compte avec cet email existe déjà.');
         }
     };
 
@@ -64,6 +50,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         setPassword('');
         setConfirmPassword('');
         setName('');
+        setEmail('');
         setAuthMode(prev => prev === 'login' ? 'signup' : 'login');
     };
     
@@ -81,7 +68,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
 
             {authMode === 'login' ? (
-                 <form onSubmit={handleLogin} className="space-y-6">
+                 <form onSubmit={handleLoginSubmit} className="space-y-6">
                     <div>
                         <label htmlFor="email" className="text-sm font-bold text-gray-400 block">Email</label>
                         <input
@@ -90,6 +77,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
+                            placeholder="votre@email.com"
                             className={inputStyle}
                         />
                     </div>
@@ -101,6 +89,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
+                            placeholder="••••••••"
                             className={inputStyle}
                         />
                     </div>
@@ -115,7 +104,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     </div>
                 </form>
             ) : (
-                <form onSubmit={handleSignUp} className="space-y-4">
+                <form onSubmit={handleSignUpSubmit} className="space-y-4">
                     <div>
                         <label htmlFor="name" className="text-sm font-bold text-gray-400 block">Nom complet</label>
                         <input
@@ -124,6 +113,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
+                            placeholder="Ibrahim Diallo"
                             className={inputStyle}
                         />
                     </div>
@@ -135,6 +125,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
+                            placeholder="votre@email.com"
                             className={inputStyle}
                         />
                     </div>
@@ -146,6 +137,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
+                            placeholder="••••••••"
                             className={inputStyle}
                         />
                     </div>
@@ -157,6 +149,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             required
+                            placeholder="••••••••"
                             className={inputStyle}
                         />
                     </div>

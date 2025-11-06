@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Page, Transaction, Invoice, UserProfile, AppNotification } from './types';
-import { mockUserProfile } from './data/mockData';
-import { authService } from './services/authService';
-import { profileService } from './services/profileService';
-import { transactionService } from './services/transactionService';
-import { invoiceService } from './services/invoiceService';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -16,79 +11,62 @@ import Reports from './components/Reports';
 import AiAssistant from './components/AiAssistant';
 import Profile from './components/Profile';
 
+// Define initial empty state for new users
+const initialTransactions: Transaction[] = [];
+const initialInvoices: Invoice[] = [];
+const defaultUserProfileTemplate: Omit<UserProfile, 'name' | 'email' | 'companyName'> = {
+  vatNumber: "",
+  address: "",
+  phone: "",
+  alertSettings: {
+    lowBalance: { enabled: true, threshold: 500 },
+    overdueInvoice: { enabled: true, days: 1 },
+    upcomingInvoice: { enabled: true, days: 7 },
+  },
+};
+
 const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<string | null>(() => sessionStorage.getItem('ibra-compta-user'));
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [profile, setProfile] = useState<UserProfile>(mockUserProfile);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  
   const [prefilledAiQuestion, setPrefilledAiQuestion] = useState('');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(true);
 
+  // Load user data from localStorage when currentUser changes
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const user = await authService.getCurrentUser();
-        if (user) {
-          setUserId(user.id);
-          setIsLoggedIn(true);
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
-      } finally {
-        setLoading(false);
+    if (currentUser) {
+      const userData = localStorage.getItem(`ibra-compta-data-${currentUser}`);
+      if (userData) {
+        const { transactions, invoices, profile } = JSON.parse(userData);
+        setTransactions(transactions);
+        setInvoices(invoices);
+        setProfile(profile);
       }
-    };
+    } else {
+      // Clear data on logout
+      setTransactions(initialTransactions);
+      setInvoices(initialInvoices);
+      setProfile(null);
+    }
+  }, [currentUser]);
 
-    checkAuth();
-
-    const { data: authListener } = authService.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUserId(session.user.id);
-        setIsLoggedIn(true);
-      } else {
-        setUserId(null);
-        setIsLoggedIn(false);
-      }
-    });
-
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
-  }, []);
-
+  // Save user data to localStorage when it changes
   useEffect(() => {
-    if (!userId || !isLoggedIn) return;
+    if (currentUser && profile) {
+      const userData = JSON.stringify({ transactions, invoices, profile });
+      localStorage.setItem(`ibra-compta-data-${currentUser}`, userData);
+    }
+  }, [transactions, invoices, profile, currentUser]);
 
-    const loadData = async () => {
-      try {
-        const [userProfile, userTransactions, userInvoices] = await Promise.all([
-          profileService.getProfile(userId),
-          transactionService.getTransactions(userId),
-          invoiceService.getInvoices(userId),
-        ]);
-
-        if (userProfile) {
-          setProfile(userProfile);
-        } else {
-          await profileService.createProfile(userId, mockUserProfile);
-          setProfile(mockUserProfile);
-        }
-
-        setTransactions(userTransactions);
-        setInvoices(userInvoices);
-      } catch (error) {
-        console.error('Error loading data:', error);
-      }
-    };
-
-    loadData();
-  }, [userId, isLoggedIn]);
 
   // Notification Generation Logic
   useEffect(() => {
+    if (!profile) return;
+
     const newNotifications: AppNotification[] = [];
     const now = new Date();
     const { alertSettings } = profile;
@@ -143,21 +121,17 @@ const App: React.FC = () => {
         }
     }
     
-    // Merge notifications, preserving read status of existing ones
     setNotifications(prev => {
         const newNotificationsMap = new Map(newNotifications.map(n => [n.id, n]));
         const prevNotificationsMap = new Map(prev.map(n => [n.id, n]));
-
         const mergedNotifications = new Map([...prevNotificationsMap, ...newNotificationsMap]);
         
-        // Update read status from previous notifications
         for(const [id, notif] of mergedNotifications.entries()){
             if(prevNotificationsMap.has(id)){
                 notif.read = prevNotificationsMap.get(id)!.read;
             }
         }
         
-        // Filter out notifications that are no longer active
         const activeIds = new Set(newNotifications.map(n => n.id));
         const allNotifications = Array.from(mergedNotifications.values());
         const stillRelevant = allNotifications.filter(n => {
@@ -167,106 +141,107 @@ const App: React.FC = () => {
 
         return stillRelevant.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
     });
-}, [transactions, invoices, profile]);
+  }, [transactions, invoices, profile]);
 
 
-  const handleLogin = () => setIsLoggedIn(true);
-  const handleLogout = async () => {
-    try {
-      await authService.signOut();
-      setIsLoggedIn(false);
-      setUserId(null);
-      setTransactions([]);
-      setInvoices([]);
-      setProfile(mockUserProfile);
-    } catch (error) {
-      console.error('Logout error:', error);
+  const handleLogin = (email: string, password: string): boolean => {
+    const users = JSON.parse(localStorage.getItem('ibra-compta-users') || '{}');
+    if (users[email] && users[email].password === password) {
+      setCurrentUser(email);
+      sessionStorage.setItem('ibra-compta-user', email);
+      return true;
     }
-  };
-
-  const addTransactions = async (newTransactions: Omit<Transaction, 'id'>[]) => {
-    if (!userId) return;
-    try {
-      const addedTransactions = await Promise.all(
-        newTransactions.map(t => transactionService.addTransaction(userId, t))
-      );
-      setTransactions(prev => [...prev, ...addedTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    } catch (error) {
-      console.error('Error adding transactions:', error);
-    }
+    return false;
   };
   
-  const updateTransaction = async (updatedTransaction: Transaction) => {
-    if (!userId) return;
-    try {
-      await transactionService.updateTransaction(userId, updatedTransaction);
-      setTransactions(prev =>
-        prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
-      );
-    } catch (error) {
-      console.error('Error updating transaction:', error);
+  const handleSignUp = (name: string, email: string, password: string): boolean => {
+    const users = JSON.parse(localStorage.getItem('ibra-compta-users') || '{}');
+    if (users[email]) {
+        return false; // User already exists
     }
+
+    users[email] = { password };
+    localStorage.setItem('ibra-compta-users', JSON.stringify(users));
+    
+    const newUserProfile: UserProfile = {
+      ...defaultUserProfileTemplate,
+      name,
+      email,
+      companyName: `${name}'s Company`,
+    };
+
+    const initialUserData = {
+      transactions: initialTransactions,
+      invoices: initialInvoices,
+      profile: newUserProfile,
+    };
+    localStorage.setItem(`ibra-compta-data-${email}`, JSON.stringify(initialUserData));
+
+    return true;
   };
 
-  const deleteTransaction = async (id: string) => {
-    if (!userId) return;
-    try {
-      await transactionService.deleteTransaction(userId, id);
-      setTransactions(prevTransactions => prevTransactions.filter(t => t.id !== id));
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-    }
+  const handleLogout = () => {
+    setCurrentUser(null);
+    sessionStorage.removeItem('ibra-compta-user');
+    setCurrentPage('dashboard');
   };
 
-  const addInvoice = async (newInvoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
-    if (!userId) return;
-    try {
-      const addedInvoice = await invoiceService.addInvoice(userId, newInvoice);
-      setInvoices(prev => [...prev, addedInvoice].sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()));
-    } catch (error) {
-      console.error('Error adding invoice:', error);
-    }
+  const addTransactions = (newTransactions: Omit<Transaction, 'id'>[]) => {
+    const transactionsToAdd = newTransactions.map((t, i) => ({
+      ...t,
+      id: `T${transactions.length + i + 1}`,
+    }));
+    setTransactions(prev => [...prev, ...transactionsToAdd].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   };
   
-  const updateInvoice = async (updatedInvoice: Invoice) => {
-    if (!userId) return;
-    try {
-      await invoiceService.updateInvoice(userId, updatedInvoice);
-      setInvoices(prev =>
-        prev.map(i => (i.id === updatedInvoice.id ? updatedInvoice : i))
-      );
-    } catch (error) {
-      console.error('Error updating invoice:', error);
-    }
+  const updateTransaction = (updatedTransaction: Transaction) => {
+    setTransactions(prev => 
+      prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
+    );
   };
 
-  const updateInvoiceStatus = async (id: string, status: 'Payée' | 'Impayée') => {
-    if (!userId) return;
-    try {
-      await invoiceService.updateInvoiceStatus(userId, id, status);
-      setInvoices(prevInvoices =>
-        prevInvoices.map(inv =>
-          inv.id === id ? { ...inv, status } : inv
-        )
-      );
-    } catch (error) {
-      console.error('Error updating invoice status:', error);
-    }
+  const deleteTransaction = (id: string) => {
+    setTransactions(prevTransactions => prevTransactions.filter(t => t.id !== id));
   };
 
-  const deleteInvoice = async (id: string) => {
-    if (!userId) return;
-    try {
-      await invoiceService.deleteInvoice(userId, id);
-      setInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== id));
-    } catch (error) {
-      console.error('Error deleting invoice:', error);
-    }
+  const addInvoice = (newInvoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
+    const nextInvoiceNumber = `INV-2024-${String(invoices.length + 1).padStart(4, '0')}`;
+    const invoiceToAdd: Invoice = {
+      ...newInvoice,
+      id: `I${invoices.length + 1}`,
+      invoiceNumber: nextInvoiceNumber,
+    };
+    setInvoices(prev => [...prev, invoiceToAdd].sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()));
+  };
+  
+  const updateInvoice = (updatedInvoice: Invoice) => {
+    setInvoices(prev => 
+      prev.map(i => (i.id === updatedInvoice.id ? updatedInvoice : i))
+    );
   };
 
-  const handleDeleteAccount = async () => {
-    console.log("Account deletion process initiated.");
-    await handleLogout();
+  const updateInvoiceStatus = (id: string, status: 'Payée' | 'Impayée') => {
+    setInvoices(prevInvoices =>
+      prevInvoices.map(inv =>
+        inv.id === id ? { ...inv, status } : inv
+      )
+    );
+  };
+
+  const deleteInvoice = (id: string) => {
+    setInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== id));
+  };
+
+  const handleDeleteAccount = () => {
+    if (!currentUser) return;
+    
+    const users = JSON.parse(localStorage.getItem('ibra-compta-users') || '{}');
+    delete users[currentUser];
+    localStorage.setItem('ibra-compta-users', JSON.stringify(users));
+
+    localStorage.removeItem(`ibra-compta-data-${currentUser}`);
+
+    handleLogout();
   };
 
   const handleAskAi = (question: string) => {
@@ -288,6 +263,8 @@ const App: React.FC = () => {
 
 
   const renderPage = () => {
+    if (!profile) return <div className="text-center p-8">Chargement de vos données...</div>;
+
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard transactions={transactions} invoices={invoices} profile={profile} />;
@@ -310,16 +287,8 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-white text-xl">Chargement...</div>
-      </div>
-    );
-  }
-
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
+  if (!currentUser || !profile) {
+    return <Login onLogin={handleLogin} onSignUp={handleSignUp} />;
   }
 
   return (
