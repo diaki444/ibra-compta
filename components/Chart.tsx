@@ -1,37 +1,40 @@
-
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface ChartProps {
   data: any[];
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-gray-800 border border-gray-700 p-3 rounded-lg shadow-lg">
+          <p className="text-sm text-gray-400">{label}</p>
+          <p className="text-lg font-bold text-white">{`${payload[0].value.toFixed(2)} €`}</p>
+        </div>
+      );
+    }
+    return null;
+};
+
+
 const Chart: React.FC<ChartProps> = ({ data }) => {
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 h-96">
-        <h3 className="text-lg font-semibold mb-4 text-white">Évolution du chiffre d’affaires</h3>
-        <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-                data={data}
-                margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 25,
-                }}
-            >
-                <CartesianGrid strokeDasharray="3 3" stroke="#4a5568" />
-                <XAxis dataKey="name" stroke="#a0aec0" />
-                <YAxis stroke="#a0aec0" />
-                <Tooltip
-                    contentStyle={{ backgroundColor: '#1a202c', border: '1px solid #4a5568' }}
-                    labelStyle={{ color: '#a0aec0' }}
-                />
-                <Legend wrapperStyle={{color: '#a0aec0'}} />
-                <Line type="monotone" dataKey="revenus" stroke="#e53e3e" activeDot={{ r: 8 }} />
-            </LineChart>
-        </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart
+        data={data}
+        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+        <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value/1000}k`} />
+        <Tooltip
+            cursor={{ fill: 'rgba(100, 116, 139, 0.1)'}}
+            content={<CustomTooltip />}
+        />
+        <Bar dataKey="revenus" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 };
 

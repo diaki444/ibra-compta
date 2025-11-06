@@ -1,23 +1,14 @@
-
 import React from 'react';
 
 interface CardProps {
-  title: string;
-  value: string;
-  children?: React.ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
-const Card: React.FC<CardProps> = ({ title, value, children, className = '' }) => {
+const Card: React.FC<CardProps> = ({ children, className = '' }) => {
   return (
-    <div className={`bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 ${className}`}>
-      <div className="flex items-center">
-        {children && <div className="mr-4">{children}</div>}
-        <div>
-          <h4 className="text-sm font-medium text-gray-400">{title}</h4>
-          <p className="text-2xl font-bold text-white">{value}</p>
-        </div>
-      </div>
+    <div className={`bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-md transition-all duration-200 ease-in-out hover:shadow-lg hover:scale-[1.02] ${className}`}>
+      {children}
     </div>
   );
 };

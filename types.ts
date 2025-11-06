@@ -1,3 +1,4 @@
+// FIX: Removed self-import of the `Page` type to resolve a name conflict.
 export type Page = 'dashboard' | 'revenues' | 'expenses' | 'vat' | 'invoicing' | 'reports' | 'ai-assistant' | 'profile';
 
 export type TransactionType = 'revenue' | 'expense';
@@ -14,6 +15,7 @@ export interface Transaction {
   date: string;
   paymentMethod: 'Bank Transfer' | 'Cash' | 'Card';
   receiptUrl?: string;
+  status?: 'Payé' | 'Non payé';
 }
 
 export type InvoiceStatus = 'Payée' | 'En attente' | 'Impayée';
@@ -23,6 +25,7 @@ export interface Invoice {
   invoiceNumber: string;
   clientName: string;
   clientAddress: string;
+  clientVatNumber: string;
   serviceDescription: string;
   amountExVat: number;
   vatRate: number;
@@ -50,4 +53,27 @@ export interface UserProfile {
   address: string;
   email: string;
   phone: string;
+  alertSettings: {
+    lowBalance: {
+      enabled: boolean;
+      threshold: number;
+    };
+    overdueInvoice: {
+      enabled: boolean;
+      days: number;
+    };
+    upcomingInvoice: {
+      enabled: boolean;
+      days: number;
+    };
+  };
+}
+
+export interface AppNotification {
+  id: string;
+  message: string;
+  type: 'alert' | 'info' | 'success';
+  read: boolean;
+  link?: Page;
+  createdAt: Date;
 }

@@ -1,105 +1,162 @@
 import React, { useMemo } from 'react';
-import { Transaction, Invoice } from '../types';
+import { Transaction, Invoice, InvoiceStatus, UserProfile } from '../types';
 import Card from './Card';
 import Chart from './Chart';
+import { 
+    RevenueIcon, 
+    ExpenseIcon, 
+    InvoiceIcon, 
+    TrendingUpIcon,
+    TrendingDownIcon,
+    ScaleIcon,
+    ClockIcon
+} from './icons';
 
 interface DashboardProps {
     transactions: Transaction[];
     invoices: Invoice[];
+    profile: UserProfile;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ transactions, invoices }) => {
-    const { totalRevenues, totalExpenses, netBalance, vatBalance } = useMemo(() => {
-        const revenues = transactions.filter(t => t.type === 'revenue');
-        const expenses = transactions.filter(t => t.type === 'expense');
+const statusBadges: { [key in InvoiceStatus]: string } = {
+    'Payée': 'bg-green-500/20 text-green-400',
+    'En attente': 'bg-amber-500/20 text-amber-400',
+    'Impayée': 'bg-red-500/20 text-red-400',
+};
 
-        const totalRevenues = revenues.reduce((sum, t) => sum + t.amountExVat, 0);
-        const totalExpenses = expenses.reduce((sum, t) => sum + t.amountExVat, 0);
+const DashboardStatCard: React.FC<{ icon: React.ReactNode; title: string; value: string; change: { text: string; isPositive: boolean; }; }> = ({ icon, title, value, change }) => (
+    <Card className="p-4">
+        <div className="flex items-center">
+             <div className="flex-shrink-0 bg-gray-700 rounded-lg p-3 mr-4">
+                {icon}
+            </div>
+            <div>
+                <p className="text-sm text-gray-400">{title}</p>
+                <p className="text-2xl font-bold text-white">{value}</p>
+            </div>
+        </div>
+        <div className="mt-3 text-right">
+             <span className={`text-xs font-semibold px-2 py-1 rounded-md ${change.isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {change.text}
+            </span>
+        </div>
+    </Card>
+);
+
+
+const Dashboard: React.FC<DashboardProps> = ({ transactions, invoices, profile }) => {
+    
+    const { totalRevenues, totalExpenses, netBalance, pendingInvoices, totalOwed } = useMemo(() => {
+        const last30Days = new Date();
+        last30Days.setDate(last30Days.getDate() - 30);
         
-        const vatOnSales = revenues.reduce((sum, t) => sum + t.vatAmount, 0);
-        const vatOnPurchases = expenses.reduce((sum, t) => sum + t.vatAmount, 0);
-        
-        return {
-            totalRevenues,
-            totalExpenses,
-            netBalance: totalRevenues - totalExpenses,
-            vatBalance: vatOnSales - vatOnPurchases,
+        const recentTransactions = transactions.filter(t => new Date(t.date) > last30Days);
+
+        const revenues = recentTransactions.filter(t => t.type === 'revenue');
+        const expenses = recentTransactions.filter(t => t.type === 'expense');
+        const totalRevenues = revenues.reduce((sum, t) => sum + t.totalAmount, 0);
+        const totalExpenses = expenses.reduce((sum, t) => sum + t.totalAmount, 0);
+        const pending = invoices.filter(inv => inv.status !== 'Payée');
+        const totalOwed = pending.reduce((sum, inv) => sum + inv.totalAmount, 0);
+        return { 
+            totalRevenues, 
+            totalExpenses, 
+            netBalance: totalRevenues - totalExpenses, 
+            pendingInvoices: pending, 
+            totalOwed 
         };
+    }, [transactions, invoices]);
+
+    const chartData = useMemo(() => {
+        const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+        const data = months.map(m => ({ name: m, revenus: 0 }));
+        transactions.filter(t => t.type === 'revenue').forEach(t => {
+            const monthIndex = new Date(t.date).getMonth();
+            data[monthIndex].revenus += t.totalAmount;
+        });
+        const currentMonth = new Date().getMonth();
+        return data.slice(0, currentMonth + 1);
     }, [transactions]);
 
-    const overdueInvoices = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Compare dates only, ignoring time
-        return invoices.filter(inv => {
-            const dueDate = new Date(inv.dueDate);
-            return inv.status !== 'Payée' && dueDate < today;
-        });
-    }, [invoices]);
+    const recentHistory = useMemo(() => [...transactions, ...invoices].sort((a, b) => {
+      const dateA = new Date('date' in a ? a.date : a.issueDate);
+      const dateB = new Date('date' in b ? b.date : b.issueDate);
+      return dateB.getTime() - dateA.getTime();
+    }).slice(0, 5), [transactions, invoices]);
 
-
-    // Mock chart data
-    const chartData = [
-        { name: 'Jan', revenus: 4000 },
-        { name: 'Fév', revenus: 3000 },
-        { name: 'Mar', revenus: 5000 },
-        { name: 'Avr', revenus: 4500 },
-        { name: 'Mai', revenus: 6000 },
-        { name: 'Juin', revenus: 5800 },
-        { name: 'Juil', revenus: totalRevenues },
-    ];
-
-    // VAT Reminder logic
-    const getVatDeadline = () => {
-        const today = new Date();
-        const month = today.getMonth();
-        const year = today.getFullYear();
-        if (month <= 3) return `20 Avril ${year}`;
-        if (month <= 6) return `20 Juillet ${year}`;
-        if (month <= 9) return `20 Octobre ${year}`;
-        return `20 Janvier ${year + 1}`;
-    };
 
     return (
         <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card title="Revenus (HTVA)" value={`${totalRevenues.toFixed(2)} €`} />
-                <Card title="Dépenses (HTVA)" value={`${totalExpenses.toFixed(2)} €`} />
-                <Card title="Solde Net" value={`${netBalance.toFixed(2)} €`} />
-                <Card title="Solde TVA" value={`${vatBalance.toFixed(2)} €`} className={vatBalance > 0 ? 'bg-red-900 border-red-700' : 'bg-green-900 border-green-700'}/>
-            </div>
-
-            {overdueInvoices.length > 0 && (
-                <div className="bg-red-900/50 border border-red-700 text-red-100 p-4 rounded-lg" role="alert">
-                    <p className="font-bold text-lg mb-2">Factures en Retard</p>
-                    <div className="space-y-2">
-                        {overdueInvoices.map(inv => {
-                            const today = new Date();
-                            const dueDate = new Date(inv.dueDate);
-                            const diffTime = today.getTime() - dueDate.getTime();
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                            return (
-                                <div key={inv.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-800 p-3 rounded-md">
-                                    <div>
-                                        <span className="font-semibold">{inv.clientName}</span>
-                                        <span className="text-sm text-gray-400 ml-2">({inv.invoiceNumber}) - En retard de {diffDays} jour(s)</span>
-                                    </div>
-                                    <button className="mt-2 sm:mt-0 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-3 rounded-md transition duration-300">
-                                        Envoyer un rappel
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
+             <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-3xl font-bold text-white">Bonjour, {profile.name.split(' ')[0]} !</h2>
+                    <p className="text-gray-400 mt-1">Voici un aperçu de vos finances.</p>
                 </div>
-            )}
-
-            <div className="bg-yellow-900 border-l-4 border-yellow-500 text-yellow-100 p-4 rounded-r-lg" role="alert">
-                <p className="font-bold">Rappel TVA</p>
-                <p>N'oubliez pas votre déclaration de TVA avant le {getVatDeadline()}.</p>
             </div>
             
-            <Chart data={chartData} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <DashboardStatCard 
+                    title="Revenus (30j)"
+                    icon={<TrendingUpIcon className="text-green-400"/>}
+                    value={`${totalRevenues.toFixed(2)} €`}
+                    change={{ text: "+12%", isPositive: true }}
+                />
+                <DashboardStatCard 
+                    title="Dépenses (30j)"
+                    icon={<TrendingDownIcon className="text-red-400"/>}
+                    value={`${totalExpenses.toFixed(2)} €`}
+                    change={{ text: "+5%", isPositive: false }}
+                />
+                <DashboardStatCard 
+                    title="Solde Net (30j)"
+                    icon={<ScaleIcon className="text-blue-400"/>}
+                    value={`${netBalance.toFixed(2)} €`}
+                    change={{ text: netBalance >= 0 ? 'Bénéfice' : 'Déficit', isPositive: netBalance >= 0 }}
+                />
+                <DashboardStatCard 
+                    title="En attente de paiement"
+                    icon={<ClockIcon className="text-amber-400"/>}
+                    value={`${totalOwed.toFixed(2)} €`}
+                    change={{ text: `${pendingInvoices.length} factures`, isPositive: false }}
+                />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                    <Card className="h-96">
+                        <h3 className="text-lg font-semibold text-white mb-4">Vue d'ensemble des revenus</h3>
+                        <Chart data={chartData} />
+                    </Card>
+                </div>
+                <div>
+                    <Card>
+                        <h3 className="text-lg font-semibold text-white mb-4">Flux d'activité</h3>
+                        <div className="space-y-4">
+                          {recentHistory.map((item) => (
+                            <div key={item.id} className="flex items-center space-x-4">
+                               <div className={`flex-shrink-0 p-2 rounded-full ${'type' in item ? (item.type === 'revenue' ? 'bg-green-500/20' : 'bg-red-500/20') : 'bg-blue-500/20'}`}>
+                                    {'type' in item ? (item.type === 'revenue' ? <RevenueIcon className="text-green-400" /> : <ExpenseIcon className="text-red-400"/>) : <InvoiceIcon className="text-blue-400" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm text-gray-200 truncate">{'source' in item ? item.source : item.clientName}</p>
+                                    <p className="text-xs text-gray-400">{'date' in item ? item.date : item.issueDate}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className={`font-bold text-sm ${'type' in item && item.type === 'expense' ? 'text-red-400' : 'text-green-400'}`}>
+                                      {('type' in item && item.type === 'expense') ? '-' : '+'} {item.totalAmount.toFixed(2)}€
+                                    </p>
+                                    {'status' in item && (
+                                        <span className={`text-xs px-2 py-0.5 rounded-md mt-1 inline-block ${statusBadges[item.status]}`}>
+                                            {item.status}
+                                        </span>
+                                     )}
+                                </div>
+                            </div>
+                          ))}
+                        </div>
+                    </Card>
+              </div>
+            </div>
         </div>
     );
 };
