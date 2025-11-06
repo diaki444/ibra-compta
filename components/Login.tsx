@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { authService } from '../services/authService';
+import { profileService } from '../services/profileService';
+import { mockUserProfile } from '../data/mockData';
 
 interface LoginProps {
   onLogin: () => void;
@@ -15,28 +18,45 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        if (email === 'ibrahim.diallo@example.com' && password === 'password') {
+        try {
+            await authService.signIn(email, password);
             onLogin();
-        } else {
-            setError('Email ou mot de passe incorrect.');
+        } catch (err: any) {
+            setError(err.message || 'Email ou mot de passe incorrect.');
         }
     };
 
-    const handleSignUp = (e: React.FormEvent) => {
+    const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         if (password !== confirmPassword) {
             setError('Les mots de passe ne correspondent pas.');
             return;
         }
-        alert(`Compte créé pour ${name} ! Vous pouvez maintenant vous connecter.`);
-        setAuthMode('login');
-        setName('');
-        setConfirmPassword('');
-        setPassword('');
+        try {
+            const { user } = await authService.signUp(email, password);
+            if (user) {
+                await profileService.createProfile(user.id, {
+                    name,
+                    email,
+                    companyName: mockUserProfile.companyName,
+                    vatNumber: mockUserProfile.vatNumber,
+                    address: mockUserProfile.address,
+                    phone: mockUserProfile.phone,
+                    alertSettings: mockUserProfile.alertSettings,
+                });
+            }
+            alert(`Compte créé pour ${name} ! Vous pouvez maintenant vous connecter.`);
+            setAuthMode('login');
+            setName('');
+            setConfirmPassword('');
+            setPassword('');
+        } catch (err: any) {
+            setError(err.message || 'Erreur lors de la création du compte.');
+        }
     };
 
     const toggleAuthMode = () => {

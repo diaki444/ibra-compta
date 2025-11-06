@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Page, Transaction, Invoice, UserProfile, AppNotification } from './types';
-import { mockTransactions, mockInvoices, mockUserProfile } from './data/mockData';
+import { mockUserProfile } from './data/mockData';
+import { authService } from './services/authService';
+import { profileService } from './services/profileService';
+import { transactionService } from './services/transactionService';
+import { invoiceService } from './services/invoiceService';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -14,12 +18,74 @@ import Profile from './components/Profile';
 
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [profile, setProfile] = useState<UserProfile>(mockUserProfile);
   const [prefilledAiQuestion, setPrefilledAiQuestion] = useState('');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await authService.getCurrentUser();
+        if (user) {
+          setUserId(user.id);
+          setIsLoggedIn(true);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    const { data: authListener } = authService.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUserId(session.user.id);
+        setIsLoggedIn(true);
+      } else {
+        setUserId(null);
+        setIsLoggedIn(false);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!userId || !isLoggedIn) return;
+
+    const loadData = async () => {
+      try {
+        const [userProfile, userTransactions, userInvoices] = await Promise.all([
+          profileService.getProfile(userId),
+          transactionService.getTransactions(userId),
+          invoiceService.getInvoices(userId),
+        ]);
+
+        if (userProfile) {
+          setProfile(userProfile);
+        } else {
+          await profileService.createProfile(userId, mockUserProfile);
+          setProfile(mockUserProfile);
+        }
+
+        setTransactions(userTransactions);
+        setInvoices(userInvoices);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+
+    loadData();
+  }, [userId, isLoggedIn]);
 
   // Notification Generation Logic
   useEffect(() => {
@@ -105,60 +171,102 @@ const App: React.FC = () => {
 
 
   const handleLogin = () => setIsLoggedIn(true);
-  const handleLogout = () => setIsLoggedIn(false);
+  const handleLogout = async () => {
+    try {
+      await authService.signOut();
+      setIsLoggedIn(false);
+      setUserId(null);
+      setTransactions([]);
+      setInvoices([]);
+      setProfile(mockUserProfile);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
-  const addTransactions = (newTransactions: Omit<Transaction, 'id'>[]) => {
-    const transactionsToAdd = newTransactions.map((t, i) => ({
-      ...t,
-      id: `T${transactions.length + i + 1}`,
-    }));
-    setTransactions(prev => [...prev, ...transactionsToAdd].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  const addTransactions = async (newTransactions: Omit<Transaction, 'id'>[]) => {
+    if (!userId) return;
+    try {
+      const addedTransactions = await Promise.all(
+        newTransactions.map(t => transactionService.addTransaction(userId, t))
+      );
+      setTransactions(prev => [...prev, ...addedTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    } catch (error) {
+      console.error('Error adding transactions:', error);
+    }
   };
   
-  const updateTransaction = (updatedTransaction: Transaction) => {
-    setTransactions(prev => 
-      prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
-    );
+  const updateTransaction = async (updatedTransaction: Transaction) => {
+    if (!userId) return;
+    try {
+      await transactionService.updateTransaction(userId, updatedTransaction);
+      setTransactions(prev =>
+        prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
+      );
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+    }
   };
 
-  const deleteTransaction = (id: string) => {
-    setTransactions(prevTransactions => prevTransactions.filter(t => t.id !== id));
+  const deleteTransaction = async (id: string) => {
+    if (!userId) return;
+    try {
+      await transactionService.deleteTransaction(userId, id);
+      setTransactions(prevTransactions => prevTransactions.filter(t => t.id !== id));
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+    }
   };
 
-  const addInvoice = (newInvoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
-    const nextInvoiceNumber = `INV-2024-${String(invoices.length + 1).padStart(4, '0')}`;
-    const invoiceToAdd: Invoice = {
-      ...newInvoice,
-      id: `I${invoices.length + 1}`,
-      invoiceNumber: nextInvoiceNumber,
-    };
-    setInvoices(prev => [...prev, invoiceToAdd].sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()));
+  const addInvoice = async (newInvoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
+    if (!userId) return;
+    try {
+      const addedInvoice = await invoiceService.addInvoice(userId, newInvoice);
+      setInvoices(prev => [...prev, addedInvoice].sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()));
+    } catch (error) {
+      console.error('Error adding invoice:', error);
+    }
   };
   
-  const updateInvoice = (updatedInvoice: Invoice) => {
-    setInvoices(prev => 
-      prev.map(i => (i.id === updatedInvoice.id ? updatedInvoice : i))
-    );
+  const updateInvoice = async (updatedInvoice: Invoice) => {
+    if (!userId) return;
+    try {
+      await invoiceService.updateInvoice(userId, updatedInvoice);
+      setInvoices(prev =>
+        prev.map(i => (i.id === updatedInvoice.id ? updatedInvoice : i))
+      );
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+    }
   };
 
-  const updateInvoiceStatus = (id: string, status: 'Payée' | 'Impayée') => {
-    setInvoices(prevInvoices =>
-      prevInvoices.map(inv =>
-        inv.id === id ? { ...inv, status } : inv
-      )
-    );
+  const updateInvoiceStatus = async (id: string, status: 'Payée' | 'Impayée') => {
+    if (!userId) return;
+    try {
+      await invoiceService.updateInvoiceStatus(userId, id, status);
+      setInvoices(prevInvoices =>
+        prevInvoices.map(inv =>
+          inv.id === id ? { ...inv, status } : inv
+        )
+      );
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+    }
   };
 
-  const deleteInvoice = (id: string) => {
-    setInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== id));
+  const deleteInvoice = async (id: string) => {
+    if (!userId) return;
+    try {
+      await invoiceService.deleteInvoice(userId, id);
+      setInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== id));
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+    }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     console.log("Account deletion process initiated.");
-    handleLogout();
-    setTransactions(mockTransactions);
-    setInvoices(mockInvoices);
-    setProfile(mockUserProfile);
+    await handleLogout();
   };
 
   const handleAskAi = (question: string) => {
@@ -201,6 +309,14 @@ const App: React.FC = () => {
         return <Dashboard transactions={transactions} invoices={invoices} profile={profile} />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-white text-xl">Chargement...</div>
+      </div>
+    );
+  }
 
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
