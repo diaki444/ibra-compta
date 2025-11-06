@@ -1,23 +1,21 @@
 {
   "name": "ibra-compta",
+  "version": "1.0.0",
+  "description": "An accounting application for Belgian freelancers to manage income, expenses, VAT, and invoicing, featuring an AI assistant for accounting advice.",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "serve . -p 3000"
   },
   "dependencies": {
+    "@google/genai": "^1.28.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.3.0",
-    "@google/genai": "^1.28.0"
+    "recharts": "^3.3.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "serve": "^14.2.3",
+    "typescript": "^5.5.3"
   }
 }
