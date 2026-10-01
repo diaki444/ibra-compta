@@ -1,0 +1,29 @@
+{
+  "name": "whatsapp-mcp",
+  "version": "0.1.0",
+  "description": "Serveur MCP local pour connecter Claude Desktop a un compte WhatsApp personnel (via Baileys / WhatsApp Web multi-device).",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsc -p tsconfig.json -w"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
